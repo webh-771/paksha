@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "1050461076702",
+    "project_id": "paksha",
+    "storage_bucket": "paksha.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1050461076702:android:1d28689ff9509c6513d64f",
+        "android_client_info": {
+          "package_name": "com.example.paksha"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBpGieu3kwX65d1ETw8KsLGx1MFRj_6slE"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
