@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../../core/constants.dart';
+import '../../core/constants.dart'; // Make sure colors conform to new theme
 import '../../providers/pantry_provider.dart';
 import '../core/models/pantry_item.dart';
 import '../../widgets/custom_button.dart';
-import '../../widgets/ingredient_tile.dart';
+import '../../widgets/ingredient_tile.dart' hide PantryCategories;
 import 'add_item_page.dart';
 import 'image_scan_page.dart';
 
@@ -15,39 +15,17 @@ class PantryPage extends StatefulWidget {
   _PantryPageState createState() => _PantryPageState();
 }
 
-class _PantryPageState extends State<PantryPage> with SingleTickerProviderStateMixin {
-  late TabController _tabController;
+class _PantryPageState extends State<PantryPage> {
   String _searchQuery = '';
   final TextEditingController _searchController = TextEditingController();
-  String _selectedCategory = 'All';
-  bool _isSearchVisible = false;
-
-  @override
-  void initState() {
-    super.initState();
-    _tabController = TabController(length: 2, vsync: this);
-
-    // Load pantry items when the page initializes
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      final pantryProvider = Provider.of<PantryProvider>(context, listen: false);
-      pantryProvider.loadPantryItems();
-    });
-  }
-
-  @override
-  void dispose() {
-    _tabController.dispose();
-    _searchController.dispose();
-    super.dispose();
-  }
+  String _selectedFilter = "All";
+  bool _lowStockOnly = false;
 
   void _navigateToAddItem([PantryItem? item]) {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => AddItemPage(
-          itemToEdit: item,
-        ),
+        builder: (context) => AddItemPage(itemToEdit: item),
       ),
     );
   }
@@ -59,561 +37,396 @@ class _PantryPageState extends State<PantryPage> with SingleTickerProviderStateM
     );
   }
 
-  void _showSearchBar() {
-    setState(() {
-      _isSearchVisible = !_isSearchVisible;
-      if (!_isSearchVisible) {
-        _searchQuery = '';
-        _searchController.clear();
-      }
-    });
-  }
-
-  void _showFilterOptions() {
-    showModalBottomSheet(
-      context: context,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20.0)),
-      ),
-      builder: (BuildContext context) {
-        final pantryProvider = Provider.of<PantryProvider>(context, listen: false);
-        final categories = ['All', ...pantryProvider.categories];
-
-        return Padding(
-          padding: const EdgeInsets.symmetric(vertical: AppDimensions.lg),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: AppDimensions.lg),
-                child: Row(
-                  children: [
-                    Text(
-                      'Filter by Category',
-                      style: AppTextStyles.headline3,
-                    ),
-                    const Spacer(),
-                    IconButton(
-                      icon: const Icon(Icons.close),
-                      onPressed: () => Navigator.pop(context),
-                    ),
-                  ],
-                ),
-              ),
-              const Divider(),
-              Expanded(
-                child: ListView.builder(
-                  shrinkWrap: true,
-                  itemCount: categories.length,
-                  itemBuilder: (context, index) {
-                    final category = categories[index];
-                    return ListTile(
-                      leading: category != 'All'
-                          ? Icon(
-                        PantryCategories.getIconForCategory(category),
-                        color: PantryCategories.getColorForCategory(category),
-                      )
-                          : const Icon(Icons.all_inclusive),
-                      title: Text(category),
-                      selected: _selectedCategory == category,
-                      selectedTileColor: AppColors.secondarySaffronLight.withOpacity(0.2),
-                      onTap: () {
-                        setState(() {
-                          _selectedCategory = category;
-                        });
-                        Navigator.pop(context);
-                      },
-                    );
-                  },
-                ),
-              ),
-            ],
-          ),
-        );
-      },
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
+    // New colors (edit to match your brand/desired scheme!)
+    const Color background = Color(0xFF19271B);      // Page bg
+    const Color cardColor = Color(0xFF233529);       // Card bg
+    const Color greenAccent = Color(0xFF4CAF50);     // Monthec green
+    const Color yellowAccent = Color(0xFFF7D049);    // For lemons etc.
+    const Color darkText = Colors.white;
+    const Color subtitle = Color(0xFFB7C4B7);
+    const Color searchCardBg = Color(0xFF243424);
+
     return Scaffold(
+      backgroundColor: background,
       appBar: AppBar(
-        title: Text(AppStrings.pantryTitle, style: AppTextStyles.headline2.copyWith(color: AppColors.textLight)),
-        backgroundColor: AppColors.primarySaffron,
-        elevation: 0,
+        backgroundColor: cardColor,
+        elevation: 2,
+        automaticallyImplyLeading: false,
+        title: const Text("My Pantry", style: TextStyle(color: darkText, fontWeight: FontWeight.bold)),
+        centerTitle: true,
         actions: [
+          // Camera Button for Scanning
           IconButton(
-            icon: Icon(_isSearchVisible ? Icons.close : AppIcons.search),
-            onPressed: _showSearchBar,
+            tooltip: 'Scan Item',
+            icon: const Icon(Icons.camera_alt_outlined, color: greenAccent, size: 26),
+            onPressed: _navigateToScanItem,
           ),
+          // Add Item Button
           IconButton(
-            icon: Icon(AppIcons.filter),
-            onPressed: _showFilterOptions,
+            tooltip: "+ Add Item",
+            icon: const Icon(Icons.add_circle_outline, color: greenAccent, size: 26),
+            onPressed: () => _navigateToAddItem(),
           ),
         ],
         bottom: PreferredSize(
-          preferredSize: Size.fromHeight(_isSearchVisible ? 100 : 50),
-          child: Column(
+          preferredSize: const Size.fromHeight(72),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+            child: _pantrySearchAndFilter(context, searchCardBg, greenAccent, darkText, subtitle),
+          ),
+        ),
+      ),
+      body: Container(
+        color: background,
+        child: Consumer<PantryProvider>(
+          builder: (context, provider, _) {
+            final allItems = provider.pantryItems;
+            final filteredItems = allItems
+                .where((item) {
+              if (_searchQuery.isNotEmpty &&
+                  !item.name.toLowerCase().contains(_searchQuery.toLowerCase())) {
+                return false;
+              }
+              if (_selectedFilter != "All" && item.category != _selectedFilter) {
+                return false;
+              }
+              if (_lowStockOnly && !item.isLowStock) {
+                return false;
+              }
+              return true;
+            })
+                .toList();
+
+            if (provider.isLoading) {
+              return const Center(child: CircularProgressIndicator(color: greenAccent));
+            }
+
+            if (filteredItems.isEmpty) {
+              return _buildEmptyState(context, greenAccent);
+            }
+
+            return ListView.builder(
+              padding: const EdgeInsets.all(16),
+              itemCount: filteredItems.length,
+              itemBuilder: (context, i) {
+                final item = filteredItems[i];
+                return _PantryItemCard(
+                  item: item,
+                  onTap: () => _showDetails(context, item),
+                  onEdit: () => _navigateToAddItem(item),
+                  onDelete: () => _deleteItem(context, item),
+                  greenAccent: greenAccent,
+                  yellowAccent: yellowAccent,
+                  cardColor: cardColor,
+                  subtitle: subtitle,
+                );
+              },
+            );
+          },
+        ),
+      ),
+      floatingActionButton: null, // Camera and Add are now in AppBar for compactness.
+    );
+  }
+
+  Widget _pantrySearchAndFilter(
+      BuildContext context,
+      Color cardBg,
+      Color accent,
+      Color darkText,
+      Color subtitle,
+      ) {
+    final provider = Provider.of<PantryProvider>(context, listen: false);
+    final categories = ["All", ...provider.categories];
+    return Row(
+      children: [
+        Expanded(
+          flex: 2,
+          child: Container(
+            decoration: BoxDecoration(
+              color: cardBg,
+              borderRadius: BorderRadius.circular(14),
+            ),
+            padding: const EdgeInsets.symmetric(horizontal: 8),
+            child: TextField(
+              controller: _searchController,
+              style: TextStyle(color: darkText),
+              decoration: InputDecoration(
+                icon: Icon(Icons.search, color: subtitle),
+                border: InputBorder.none,
+                hintText: 'Search',
+                hintStyle: const TextStyle(color: Color(0xFFB7C4B7)),
+              ),
+              onChanged: (value) => setState(() => _searchQuery = value),
+            ),
+          ),
+        ),
+        const SizedBox(width: 12),
+        // Category Dropdown
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+          decoration: BoxDecoration(
+            color: cardBg,
+            borderRadius: BorderRadius.circular(14),
+          ),
+          child: DropdownButtonHideUnderline(
+            child: DropdownButton<String>(
+              dropdownColor: cardBg,
+              value: _selectedFilter,
+              icon: Icon(Icons.keyboard_arrow_down, color: accent),
+              style: TextStyle(color: darkText),
+              items: categories
+                  .map((cat) => DropdownMenuItem(
+                value: cat,
+                child: Text(cat, style: TextStyle(color: cat == "All" ? subtitle : darkText)),
+              ))
+                  .toList(),
+              onChanged: (v) => setState(() => _selectedFilter = v!),
+            ),
+          ),
+        ),
+        const SizedBox(width: 12),
+        // Low Stock Toggle
+        Container(
+          height: 38,
+          decoration: BoxDecoration(
+            color: cardBg,
+            borderRadius: BorderRadius.circular(14),
+          ),
+          child: Row(
             children: [
-              if (_isSearchVisible)
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: AppDimensions.md, vertical: AppDimensions.sm),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: AppDimensions.md,
-                      vertical: AppDimensions.sm,
-                    ),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(AppDimensions.radiusMd),
-                    ),
-                    child: Row(
-                      children: [
-                        Icon(Icons.search, color: AppColors.textSubtitle),
-                        SizedBox(width: AppDimensions.sm),
-                        Expanded(
-                          child: TextField(
-                            controller: _searchController,
-                            decoration: InputDecoration(
-                              hintText: AppStrings.search,
-                              border: InputBorder.none,
-                              hintStyle: TextStyle(color: AppColors.textSubtitle),
-                            ),
-                            onChanged: (value) {
-                              setState(() {
-                                _searchQuery = value;
-                              });
-                            },
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
+              IconButton(
+                tooltip: 'Show only Low Stock',
+                icon: Icon(
+                  _lowStockOnly ? Icons.warning : Icons.warning_amber_outlined,
+                  color: _lowStockOnly ? Colors.amber : subtitle,
+                  size: 22,
                 ),
-              TabBar(
-                controller: _tabController,
-                indicatorColor: Colors.white,
-                tabs: const [
-                  Tab(text: 'All Items'),
-                  Tab(text: 'Low Stock'),
-                ],
+                onPressed: () => setState(() => _lowStockOnly = !_lowStockOnly),
               ),
             ],
           ),
         ),
-      ),
-      body: Column(
-        children: [
-          if (_selectedCategory != 'All')
-            Container(
-              color: AppColors.backgroundLight,
-              padding: const EdgeInsets.symmetric(
-                horizontal: AppDimensions.md,
-                vertical: AppDimensions.sm,
-              ),
-              child: Row(
-                children: [
-                  Icon(
-                    PantryCategories.getIconForCategory(_selectedCategory),
-                    color: PantryCategories.getColorForCategory(_selectedCategory),
-                  ),
-                  SizedBox(width: AppDimensions.sm),
-                  Text(
-                    'Filtered by: $_selectedCategory',
-                    style: AppTextStyles.subtitle1.copyWith(
-                      color: PantryCategories.getColorForCategory(_selectedCategory),
-                    ),
-                  ),
-                  const Spacer(),
-                  IconButton(
-                    icon: const Icon(Icons.clear),
-                    onPressed: () {
-                      setState(() {
-                        _selectedCategory = 'All';
-                      });
-                    },
-                  ),
-                ],
-              ),
+      ],
+    );
+  }
+
+  Widget _buildEmptyState(BuildContext context, Color greenAccent) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.only(top: 72),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.inventory_2, color: greenAccent.withOpacity(0.40), size: 90),
+            const SizedBox(height: 30),
+            const Text(
+              "No items found in your pantry.",
+              style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w500),
             ),
-          Expanded(
-            child: Consumer<PantryProvider>(
-              builder: (context, pantryProvider, child) {
-                if (pantryProvider.isLoading) {
-                  return const Center(child: CircularProgressIndicator(
-                    valueColor: AlwaysStoppedAnimation<Color>(AppColors.primarySaffron),
-                  ));
-                }
-
-                List<PantryItem> filteredItems = _getFilteredItems(pantryProvider.pantryItems);
-
-                if (filteredItems.isEmpty) {
-                  return _buildEmptyState();
-                }
-
-                return TabBarView(
-                  controller: _tabController,
-                  children: [
-                    // All Items Tab
-                    _buildPantryItemsList(filteredItems),
-
-                    // Low Stock Tab
-                    _buildPantryItemsList(
-                      filteredItems.where((item) => item.isLowStock).toList(),
-                      isLowStock: true,
-                    ),
-                  ],
-                );
-              },
+            const SizedBox(height: 20),
+            ElevatedButton.icon(
+              icon: const Icon(Icons.add, color: Colors.white),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: greenAccent,
+                padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 12),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+              label: const Text("Add Item", style: TextStyle(color: Colors.white, fontSize: 15)),
+              onPressed: () => _navigateToAddItem(),
             ),
-          ),
-        ],
-      ),
-      floatingActionButton: Column(
-        mainAxisAlignment: MainAxisAlignment.end,
-        children: [
-          FloatingActionButton(
-            heroTag: 'scan',
-            onPressed: _navigateToScanItem,
-            backgroundColor: AppColors.primaryMintGreen,
-            child: const Icon(AppIcons.scan),
-          ),
-          const SizedBox(height: AppDimensions.md),
-          FloatingActionButton(
-            heroTag: 'add',
-            onPressed: () => _navigateToAddItem(),
-            backgroundColor: AppColors.primarySaffron,
-            child: const Icon(AppIcons.add),
-          ),
-        ],
+            const SizedBox(height: 10),
+            OutlinedButton.icon(
+              icon: const Icon(Icons.camera_alt_outlined),
+              label: const Text("Scan Item"),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: greenAccent,
+                side: BorderSide(color: greenAccent, width: 1.7),
+                padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+              onPressed: _navigateToScanItem,
+            ),
+          ],
+        ),
       ),
     );
   }
 
-  List<PantryItem> _getFilteredItems(List<PantryItem> items) {
-    List<PantryItem> filteredItems = List.from(items);
-
-    // Apply search filter
-    if (_searchQuery.isNotEmpty) {
-      filteredItems = filteredItems
-          .where((item) =>
-      item.name.toLowerCase().contains(_searchQuery.toLowerCase()) ||
-          item.category.toLowerCase().contains(_searchQuery.toLowerCase()) ||
-          (item.notes != null && item.notes!.toLowerCase().contains(_searchQuery.toLowerCase())))
-          .toList();
-    }
-
-    // Apply category filter
-    if (_selectedCategory != 'All') {
-      filteredItems = filteredItems.where((item) => item.category == _selectedCategory).toList();
-    }
-
-    // Sort items by name
-    filteredItems.sort((a, b) => a.name.compareTo(b.name));
-
-    return filteredItems;
-  }
-
-  Widget _buildPantryItemsList(List<PantryItem> items, {bool isLowStock = false}) {
-    // Group items by category
-    final Map<String, List<PantryItem>> itemsByCategory = {};
-
-    for (var item in items) {
-      if (!itemsByCategory.containsKey(item.category)) {
-        itemsByCategory[item.category] = [];
-      }
-      itemsByCategory[item.category]!.add(item);
-    }
-
-    // Sort categories alphabetically
-    final sortedCategories = itemsByCategory.keys.toList()..sort();
-
-    if (items.isEmpty) {
-      return Center(
+  void _showDetails(BuildContext ctx, PantryItem item) {
+    showModalBottomSheet(
+      context: ctx,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      backgroundColor: const Color(0xFF233529), // Card color
+      builder: (ctx) => Padding(
+        padding: const EdgeInsets.all(24),
         child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Icon(
-              isLowStock ? AppIcons.warning : AppIcons.pantry,
-              size: 72,
-              color: isLowStock ? AppColors.warning : AppColors.primarySaffron,
+            Row(
+              children: [
+                Icon(
+                  PantryCategories.getIconForCategory(item.category),
+                  color: PantryCategories.getColorForCategory(item.category),
+                  size: 32,
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Text(item.name, style: const TextStyle(fontSize: 21, fontWeight: FontWeight.bold, color: Colors.white)),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.edit, color: Colors.white),
+                  onPressed: () {
+                    Navigator.pop(context);
+                    _navigateToAddItem(item);
+                  },
+                ),
+                IconButton(
+                  icon: const Icon(Icons.delete, color: Colors.redAccent),
+                  onPressed: () {
+                    Navigator.pop(context);
+                    _deleteItem(context, item);
+                  },
+                ),
+              ],
             ),
-            const SizedBox(height: AppDimensions.md),
+            const SizedBox(height: 10),
             Text(
-              isLowStock
-                  ? 'No low stock items'
-                  : AppStrings.emptyPantryMessage,
-              style: AppTextStyles.subtitle1,
-              textAlign: TextAlign.center,
+              "Quantity: ${item.quantity} ${item.unitString}",
+              style: const TextStyle(color: Color(0xFFB7C4B7), fontSize: 15),
             ),
-            const SizedBox(height: AppDimensions.lg),
-            if (!isLowStock)
-              CustomButton(
-                text: 'Add Your First Item',
-                icon: AppIcons.add,
-                onPressed: () => _navigateToAddItem(),
-                backgroundColor: AppColors.primarySaffron,
+            const SizedBox(height: 7),
+            if (item.notes != null && item.notes!.isNotEmpty)
+              Text(
+                item.notes!,
+                style: const TextStyle(color: Color(0xFFB7C4B7)),
               ),
           ],
+        ),
+      ),
+    );
+  }
+
+  void _deleteItem(BuildContext ctx, PantryItem item) {
+    showDialog(
+      context: ctx,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: const Color(0xFF233529),
+        title: const Text('Delete Item', style: TextStyle(color: Colors.white)),
+        content: Text("Are you sure you want to delete '${item.name}'?",
+            style: const TextStyle(color: Color(0xFFB7C4B7))),
+        actions: [
+          TextButton(
+            child: const Text('Cancel'),
+            onPressed: () => Navigator.pop(ctx),
+          ),
+          TextButton(
+            child: const Text('Delete', style: TextStyle(color: Colors.red)),
+            onPressed: () {
+              Provider.of<PantryProvider>(ctx, listen: false).deletePantryItem(item.id);
+              Navigator.pop(ctx);
+            },
+          )
+        ],
+      ),
+    );
+  }
+}
+
+// --- Pantry Item Card for Modern Look ---
+class _PantryItemCard extends StatelessWidget {
+  final PantryItem item;
+  final VoidCallback onTap;
+  final VoidCallback onEdit;
+  final VoidCallback onDelete;
+  final Color greenAccent;
+  final Color yellowAccent;
+  final Color cardColor;
+  final Color subtitle;
+
+  const _PantryItemCard({
+    required this.item,
+    required this.onTap,
+    required this.onEdit,
+    required this.onDelete,
+    required this.greenAccent,
+    required this.yellowAccent,
+    required this.cardColor,
+    required this.subtitle,
+    Key? key,
+  }) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    // Optionally use image, else use icon
+    Widget leading;
+    if (item.imagePath != null && item.imagePath!.isNotEmpty) {
+      leading = ClipRRect(
+        borderRadius: BorderRadius.circular(14),
+        child: Image.network(item.imagePath!, width: 58, height: 58, fit: BoxFit.cover),
+      );
+    } else {
+      leading = Container(
+        width: 58,
+        height: 58,
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(14),
+          color: (item.name.toLowerCase().contains('lemon'))
+              ? yellowAccent
+              : greenAccent.withOpacity(0.17),
+        ),
+        child: Icon(
+          PantryCategories.getIconForCategory(item.category),
+          color: PantryCategories.getColorForCategory(item.category),
+          size: 32,
         ),
       );
     }
 
-    return ListView.builder(
-      padding: const EdgeInsets.all(AppDimensions.md),
-      itemCount: sortedCategories.length,
-      itemBuilder: (context, index) {
-        final category = sortedCategories[index];
-        final categoryItems = itemsByCategory[category]!;
-
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Padding(
-              padding: const EdgeInsets.only(
-                top: AppDimensions.md,
-                bottom: AppDimensions.sm,
-              ),
-              child: Row(
-                children: [
-                  Icon(
-                    PantryCategories.getIconForCategory(category),
-                    color: PantryCategories.getColorForCategory(category),
-                  ),
-                  const SizedBox(width: AppDimensions.sm),
-                  Text(
-                    category,
-                    style: AppTextStyles.headline3.copyWith(
-                      color: PantryCategories.getColorForCategory(category),
-                    ),
-                  ),
-                  const SizedBox(width: AppDimensions.sm),
-                  Text(
-                    '(${categoryItems.length})',
-                    style: AppTextStyles.subtitle2,
-                  ),
-                ],
-              ),
-            ),
-            const Divider(),
-            ListView.builder(
-              physics: const NeverScrollableScrollPhysics(),
-              shrinkWrap: true,
-              itemCount: categoryItems.length,
-              itemBuilder: (context, itemIndex) {
-                final item = categoryItems[itemIndex];
-                return IngredientTile(
-                  pantryItem: item,
-                  onTap: () => _showItemDetails(item),
-                  onEdit: () => _editItem(item),
-                  onDelete: () => _deleteItem(item), item: item,
-                );
-              },
-            ),
-            const SizedBox(height: AppDimensions.md),
-          ],
-        );
-      },
-    );
-  }
-
-  Widget _buildEmptyState() {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Image.asset(
-            'assets/images/empty_pantry.png',
-            height: 150,
-            // If you don't have this asset, use an icon instead
-            errorBuilder: (context, error, stackTrace) => Icon(
-              AppIcons.pantry,
-              size: 100,
-              color: AppColors.primarySaffron.withOpacity(0.5),
-            ),
-          ),
-          const SizedBox(height: AppDimensions.lg),
-          Text(
-            AppStrings.emptyPantryMessage,
-            style: AppTextStyles.subtitle1,
-            textAlign: TextAlign.center,
-          ),
-          const SizedBox(height: AppDimensions.xl),
-          CustomButton(
-            text: 'Add First Item',
-            icon: AppIcons.add,
-            onPressed: () => _navigateToAddItem(),
-            backgroundColor: AppColors.primarySaffron,
-          ),
-          const SizedBox(height: AppDimensions.md),
-          CustomButton(
-            text: 'Scan Items',
-            icon: AppIcons.scan,
-            onPressed: _navigateToScanItem,
-            backgroundColor: AppColors.primaryMintGreen,
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _showItemDetails(PantryItem item) {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20.0)),
-      ),
-      builder: (BuildContext context) {
-        return Container(
-          padding: const EdgeInsets.all(AppDimensions.lg),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
+    return InkWell(
+      onTap: onTap,
+      child: Card(
+        elevation: 2,
+        color: cardColor,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+        margin: const EdgeInsets.symmetric(vertical: 9),
+        child: Padding(
+          padding: const EdgeInsets.all(13),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              Row(
-                children: [
-                  Icon(
-                    PantryCategories.getIconForCategory(item.category),
-                    color: PantryCategories.getColorForCategory(item.category),
-                    size: 32,
-                  ),
-                  const SizedBox(width: AppDimensions.md),
-                  Expanded(
-                    child: Text(
-                      item.name,
-                      style: AppTextStyles.headline2,
-                    ),
-                  ),
-                  IconButton(
-                    icon: const Icon(Icons.close),
-                    onPressed: () => Navigator.pop(context),
-                  ),
-                ],
+              leading,
+              const SizedBox(width: 20),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(item.name, style: const TextStyle(fontSize: 17, color: Colors.white, fontWeight: FontWeight.bold)),
+                    const SizedBox(height: 7),
+                    Text('${item.quantity} ${item.unitString}',
+                        style: TextStyle(color: subtitle, fontSize: 14)),
+                  ],
+                ),
               ),
-              const Divider(),
-              const SizedBox(height: AppDimensions.md),
-              _buildDetailRow('Category', item.category),
-              _buildDetailRow('Quantity', '${item.quantity} ${item.unitString}'),
-              if (item.expiryDate != null)
-                _buildDetailRow('Expires', _formatDate(item.expiryDate!)),
-              _buildDetailRow('Purchased', _formatDate(item.purchaseDate)),
-              if (item.cost > 0)
-                _buildDetailRow('Cost', '\$${item.cost.toStringAsFixed(2)}'),
-              if (item.notes != null && item.notes!.isNotEmpty)
-                _buildDetailRow('Notes', item.notes!),
-              const SizedBox(height: AppDimensions.xl),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                children: [
-                  Expanded(
-                    child: CustomButton(
-                      text: 'Edit',
-                      icon: AppIcons.edit,
-                      onPressed: () {
-                        Navigator.pop(context);
-                        _editItem(item);
-                      },
-                      backgroundColor: AppColors.info,
-                    ),
+              // Low stock badge
+              if (item.isLowStock)
+                Container(
+                  padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 10),
+                  decoration: BoxDecoration(
+                    color: Colors.amber.shade800,
+                    borderRadius: BorderRadius.circular(10),
                   ),
-                  const SizedBox(width: AppDimensions.md),
-                  Expanded(
-                    child: CustomButton(
-                      text: 'Delete',
-                      icon: AppIcons.delete,
-                      onPressed: () {
-                        Navigator.pop(context);
-                        _deleteItem(item);
-                      },
-                      backgroundColor: AppColors.error,
-                    ),
-                  ),
-                ],
-              ),
+                  child: const Text("Low", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12)),
+                ),
             ],
           ),
-        );
-      },
-    );
-  }
-
-  Widget _buildDetailRow(String label, String value) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: AppDimensions.md),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          SizedBox(
-            width: 100,
-            child: Text(
-              label,
-              style: AppTextStyles.subtitle1.copyWith(
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-          ),
-          Expanded(
-            child: Text(
-              value,
-              style: AppTextStyles.bodyText1,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  String _formatDate(DateTime date) {
-    return '${date.month}/${date.day}/${date.year}';
-  }
-
-  void _editItem(PantryItem item) {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => AddItemPage(
-          itemToEdit: item,
         ),
       ),
-    );
-  }
-
-  void _deleteItem(PantryItem item) {
-    showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          title: const Text('Delete Item'),
-          content: Text('Are you sure you want to delete ${item.name}?'),
-          actions: [
-            TextButton(
-              child: const Text('Cancel'),
-              onPressed: () => Navigator.pop(context),
-            ),
-            TextButton(
-              child: const Text('Delete', style: TextStyle(color: AppColors.error)),
-              onPressed: () {
-                final pantryProvider = Provider.of<PantryProvider>(context, listen: false);
-                pantryProvider.deletePantryItem(item.id);
-                Navigator.pop(context);
-
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text('${item.name} has been deleted'),
-                    action: SnackBarAction(
-                      label: 'Undo',
-                      onPressed: () {
-                        pantryProvider.addPantryItem(item);
-                      },
-                    ),
-                  ),
-                );
-              },
-            ),
-          ],
-        );
-      },
     );
   }
 }

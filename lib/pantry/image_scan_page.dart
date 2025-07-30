@@ -19,36 +19,41 @@ class ImageScanPage extends ConsumerStatefulWidget {
 class _ImageScanPageState extends ConsumerState<ImageScanPage> {
   File? _image;
   bool _isProcessing = false;
-  List<FoodItem> _detectedItems = []; // Changed to use FoodItem class
+  List<FoodItem> _detectedItems = [];
   final ImagePicker _picker = ImagePicker();
 
   @override
   void initState() {
     super.initState();
-    _takePicture(); // Automatically open camera when the page loads
+    // No automatic camera launch
   }
 
   Future<void> _takePicture() async {
-    final XFile? image = await _picker.pickImage(
-      source: ImageSource.camera,
-      imageQuality: 80,
-    );
+    await _pickImage(ImageSource.camera);
+  }
 
-    if (image != null) {
-      setState(() {
-        _image = File(image.path);
-        _isProcessing = true;
-        _detectedItems = []; // Clear previous results
-      });
+  Future<void> _chooseFromGallery() async {
+    await _pickImage(ImageSource.gallery);
+  }
 
-      // Process the image with the image recognition service
-      try {
-        // First test if the API is accessible
+  Future<void> _pickImage(ImageSource source) async {
+    try {
+      final XFile? image = await _picker.pickImage(
+        source: source,
+        imageQuality: 80,
+      );
+
+      if (image != null) {
+        setState(() {
+          _image = File(image.path);
+          _isProcessing = true;
+          _detectedItems = [];
+        });
+
         final foodRecognitionService = FoodRecognitionService(
-          huggingFaceApiToken: "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", // Your token
+          huggingFaceApiToken: "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",
         );
 
-        // Test API connection first
         final isApiAccessible = await foodRecognitionService.testApiConnection();
         if (!isApiAccessible) {
           throw FoodRecognitionException(
@@ -56,141 +61,155 @@ class _ImageScanPageState extends ConsumerState<ImageScanPage> {
           );
         }
 
-        // Use the correct method from our fixed service
         final items = await foodRecognitionService.classifyFoodInFile(_image!);
 
         setState(() {
-          _detectedItems = items; // Already in the correct format
+          _detectedItems = items;
           _isProcessing = false;
         });
-      } on FoodRecognitionException catch (e) {
-        setState(() {
-          _isProcessing = false;
-        });
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Food recognition failed: ${e.message}'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      } catch (e) {
-        setState(() {
-          _isProcessing = false;
-        });
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error processing image: ${e.toString()}'),
-            backgroundColor: Colors.red,
-          ),
-        );
       }
+    } on FoodRecognitionException catch (e) {
+      setState(() => _isProcessing = false);
+      _showErrorSnackBar('Food recognition failed: ${e.message}');
+    } catch (e) {
+      setState(() => _isProcessing = false);
+      _showErrorSnackBar('Error processing image: ${e.toString()}');
+    }
+  }
+
+  void _showErrorSnackBar(String message) {
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(message),
+          backgroundColor: Colors.redAccent,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    const cardBgColor = Color(0xFF2A3B2A); // Dark green card background
+    const primaryGreen = AppColors.primary;
+    final darkText = AppColors.textLight;
+    final greyText = Colors.grey[400];
+
     return Scaffold(
       backgroundColor: AppColors.backgroundLight,
       appBar: AppBar(
-        title: const Text('Scan Items', style: TextStyle(color: AppColors.darkText)),
         backgroundColor: AppColors.backgroundLight,
         elevation: 0,
+        centerTitle: true,
         iconTheme: const IconThemeData(color: AppColors.primary),
+        title: Text(
+          'Scan Items',
+          style: TextStyle(
+            color: darkText,
+            fontWeight: FontWeight.w600,
+            fontSize: 20,
+          ),
+        ),
       ),
       body: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          // Image preview
           if (_image != null)
-            Container(
-              height: 200,
-              width: double.infinity,
-              margin: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(16),
-                color: Colors.grey[200],
-                image: DecorationImage(
-                  image: FileImage(_image!),
-                  fit: BoxFit.cover,
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              child: Container(
+                height: 220,
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(20),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.18),
+                      blurRadius: 16,
+                      offset: const Offset(0, 6),
+                    ),
+                  ],
+                  image: DecorationImage(
+                    image: FileImage(_image!),
+                    fit: BoxFit.cover,
+                  ),
                 ),
               ),
             ),
 
-          // Processing indicator
           if (_isProcessing)
-            const Padding(
-              padding: EdgeInsets.all(16.0),
-              child: Column(
-                children: [
-                  CircularProgressIndicator(color: AppColors.primary),
-                  SizedBox(height: 16),
-                  Text(
-                    'Identifying items...',
-                    style: TextStyle(
-                      color: AppColors.darkText,
-                      fontWeight: FontWeight.bold,
+            Expanded(
+              child: Center(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const CircularProgressIndicator(color: AppColors.primary, strokeWidth: 3),
+                    const SizedBox(height: 16),
+                    Text(
+                      'Identifying items...',
+                      style: TextStyle(
+                        color: darkText,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 16,
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
 
-          // Detected items list
           if (!_isProcessing && _detectedItems.isNotEmpty)
             Expanded(
               child: Padding(
-                padding: const EdgeInsets.all(16.0),
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text(
+                    Text(
                       'Detected Items',
                       style: TextStyle(
-                        fontSize: 18,
+                        fontSize: 22,
                         fontWeight: FontWeight.bold,
-                        color: AppColors.darkText,
+                        color: darkText,
                       ),
                     ),
                     const SizedBox(height: 8),
                     Text(
                       'Select items to add to your pantry',
                       style: TextStyle(
-                        color: Colors.grey[600],
+                        fontSize: 14,
+                        color: Colors.grey[400],
                       ),
                     ),
                     const SizedBox(height: 16),
                     Expanded(
-                      child: ListView.builder(
+                      child: ListView.separated(
                         itemCount: _detectedItems.length,
+                        separatorBuilder: (_, __) => const SizedBox(height: 10),
                         itemBuilder: (context, index) {
                           final foodItem = _detectedItems[index];
+                          final category = _determineFoodCategory(foodItem.label);
 
-                          // Convert food category based on label
-                          String category = _determineFoodCategory(foodItem.label);
-
-                          // Create a pantry item from the detected item data
-                          final PantryItem pantryItem = PantryItem(
-                            id: '',  // Will be generated when actually saving
+                          final pantryItem = PantryItem(
+                            id: '',
                             name: foodItem.label,
                             category: category,
-                            quantity: 1.0,  // Default quantity
-                            unit: MeasurementUnit.pieces,    // Default unit
-                            lowStockThreshold: 1.0,  // Default threshold
+                            quantity: 1.0,
+                            unit: MeasurementUnit.pieces,
+                            lowStockThreshold: 1.0,
                             purchaseDate: DateTime.now(),
-                            cost: 0.0,  // Default cost
+                            cost: 0.0,
                           );
 
-                          return DetectedItemTile(
+                          return _DetectedItemCard(
                             name: foodItem.label,
                             category: category,
                             confidence: foodItem.confidence,
                             onAdd: () {
-                              // Navigate to add item page with pre-filled data
                               Navigator.push(
                                 context,
                                 MaterialPageRoute(
-                                  builder: (context) => AddItemPage(
-                                    itemToEdit: pantryItem,
-                                  ),
+                                  builder: (_) => AddItemPage(itemToEdit: pantryItem),
                                 ),
                               );
                             },
@@ -203,34 +222,75 @@ class _ImageScanPageState extends ConsumerState<ImageScanPage> {
               ),
             ),
 
-          // Empty state when no items detected
           if (!_isProcessing && _detectedItems.isEmpty && _image != null)
+            Expanded(
+              child: Center(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 32),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        Icons.search_off,
+                        size: 72,
+                        color: Colors.grey.shade400,
+                      ),
+                      const SizedBox(height: 20),
+                      Text(
+                        'No items detected',
+                        style: TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold,
+                          color: darkText,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        'Try taking another photo or add items manually',
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: Colors.grey[600],
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+
+          if (_image == null && !_isProcessing)
             Expanded(
               child: Center(
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Icon(
-                      Icons.search_off,
-                      size: 64,
-                      color: Colors.grey[400],
+                    CustomButton(
+                      text: 'Take a photo',
+                      icon: Icons.camera_alt_outlined,
+                      backgroundColor: primaryGreen,
+                      onPressed: _takePicture,
                     ),
                     const SizedBox(height: 16),
-                    const Text(
-                      'No items detected',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                        color: AppColors.darkText,
-                      ),
+                    CustomButton(
+                      text: 'Choose from Gallery',
+                      icon: Icons.photo_library,
+                      backgroundColor: primaryGreen,
+                      isPrimary: false,
+                      onPressed: _chooseFromGallery,
                     ),
-                    const SizedBox(height: 8),
-                    Text(
-                      'Try taking another photo or add items manually',
-                      style: TextStyle(
-                        color: Colors.grey[600],
-                      ),
-                      textAlign: TextAlign.center,
+                    const SizedBox(height: 16),
+                    CustomButton(
+                      text: 'Add Manually',
+                      icon: Icons.add,
+                      backgroundColor: primaryGreen,
+                      isPrimary: false,
+                      onPressed: () {
+                        Navigator.pushReplacement(
+                          context,
+                          MaterialPageRoute(builder: (context) => const AddItemPage()),
+                        );
+                      },
                     ),
                   ],
                 ),
@@ -238,45 +298,66 @@ class _ImageScanPageState extends ConsumerState<ImageScanPage> {
             ),
         ],
       ),
-      bottomNavigationBar: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Row(
-          children: [
-            Expanded(
-              child: CustomButton(
-                text: 'Take Another Photo',
-                onPressed: _takePicture,
-                icon: Icons.camera_alt,
-                backgroundColor: AppColors.primary,
+      bottomNavigationBar: (_image != null)
+          ? SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          child: Row(
+            children: [
+              Expanded(
+                child: SizedBox(
+                  height: 48,
+                  child: CustomButton(
+                    text: 'Take Another Photo',
+                    onPressed: _takePicture,
+                    icon: Icons.camera_alt,
+                    backgroundColor: primaryGreen,
+                  ),
+                ),
               ),
-            ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: CustomButton(
-                text: 'Add Manually',
-                onPressed: () {
-                  Navigator.pushReplacement(
-                    context,
-                    MaterialPageRoute(builder: (context) => const AddItemPage()),
-                  );
-                },
-                icon: Icons.add,
-                isPrimary: false,
-                backgroundColor: AppColors.primary,
+              const SizedBox(width: 12),
+              Expanded(
+                child: SizedBox(
+                  height: 48,
+                  child: CustomButton(
+                    text: 'Choose from Gallery',
+                    onPressed: _chooseFromGallery,
+                    icon: Icons.photo_library,
+                    backgroundColor: primaryGreen,
+                    isPrimary: false,
+                  ),
+                ),
               ),
-            ),
-          ],
+              const SizedBox(width: 12),
+              Expanded(
+                child: SizedBox(
+                  height: 48,
+                  child: CustomButton(
+                    text: 'Add Manually',
+                    onPressed: () {
+                      Navigator.pushReplacement(
+                        context,
+                        MaterialPageRoute(builder: (context) => const AddItemPage()),
+                      );
+                    },
+                    icon: Icons.add,
+                    backgroundColor: primaryGreen,
+                    isPrimary: false,
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
-      ),
+      )
+          : null,
     );
   }
 
-  // Helper method to determine food category based on the food label
   String _determineFoodCategory(String foodLabel) {
-    final lowercaseLabel = foodLabel.toLowerCase();
+    final label = foodLabel.toLowerCase();
 
-    // Define category mapping patterns
-    final Map<String, List<String>> categoryPatterns = {
+    final Map<String, List<String>> categories = {
       'Fruits': ['apple', 'banana', 'orange', 'berry', 'fruit', 'citrus', 'melon'],
       'Vegetables': ['carrot', 'broccoli', 'lettuce', 'vegetable', 'tomato', 'cucumber', 'spinach', 'onion', 'potato', 'garlic'],
       'Dairy': ['milk', 'cheese', 'yogurt', 'butter', 'cream', 'dairy'],
@@ -289,27 +370,24 @@ class _ImageScanPageState extends ConsumerState<ImageScanPage> {
       'Baked Goods': ['cake', 'bread', 'pie', 'pastry', 'cookie', 'muffin', 'baked'],
     };
 
-    // Check if the food label contains any patterns for each category
-    for (final category in categoryPatterns.keys) {
-      for (final pattern in categoryPatterns[category]!) {
-        if (lowercaseLabel.contains(pattern)) {
+    for (final category in categories.keys) {
+      for (final pattern in categories[category]!) {
+        if (label.contains(pattern)) {
           return category;
         }
       }
     }
-
-    // Default category if no patterns match
     return 'Others';
   }
 }
 
-class DetectedItemTile extends StatelessWidget {
+class _DetectedItemCard extends StatelessWidget {
   final String name;
   final String category;
   final double confidence;
   final VoidCallback onAdd;
 
-  const DetectedItemTile({
+  const _DetectedItemCard({
     Key? key,
     required this.name,
     required this.category,
@@ -319,61 +397,68 @@ class DetectedItemTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.grey.withOpacity(0.1),
-            spreadRadius: 1,
-            blurRadius: 3,
-            offset: const Offset(0, 1),
-          ),
-        ],
-      ),
-      child: ListTile(
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        title: Text(
-          name,
-          style: const TextStyle(
-            fontWeight: FontWeight.bold,
-            color: AppColors.darkText,
-          ),
+    // Colors for card theme
+    const cardBgColor = Color(0xFF2A3B2A);
+    const primaryGreen = AppColors.primary;
+
+    return Material(
+      elevation: 4,
+      shadowColor: Colors.black38,
+      borderRadius: BorderRadius.circular(14),
+      child: Container(
+        decoration: BoxDecoration(
+          color: cardBgColor,
+          borderRadius: BorderRadius.circular(14),
         ),
-        subtitle: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const SizedBox(height: 4),
-            Text(
-              'Category: $category',
-              style: TextStyle(color: Colors.grey[600]),
-            ),
-            const SizedBox(height: 2),
-            LinearProgressIndicator(
-              value: confidence,
-              backgroundColor: Colors.grey[200],
-              valueColor: const AlwaysStoppedAnimation<Color>(AppColors.primary),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              'Confidence: ${(confidence * 100).toStringAsFixed(0)}%',
-              style: TextStyle(color: Colors.grey[600], fontSize: 12),
-            ),
-          ],
-        ),
-        trailing: ElevatedButton(
-          onPressed: onAdd,
-          style: ElevatedButton.styleFrom(
-            backgroundColor: AppColors.primary,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(20),
+        child: ListTile(
+          contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+          title: Text(
+            name,
+            style: const TextStyle(
+              fontWeight: FontWeight.w600,
+              color: Colors.white,
+              fontSize: 16,
             ),
           ),
-          child: const Text(
-            'Add',
-            style: TextStyle(color: Colors.white),
+          subtitle: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Category: $category',
+                style: TextStyle(color: Colors.grey[400], fontSize: 13),
+              ),
+              const SizedBox(height: 6),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(4),
+                child: LinearProgressIndicator(
+                  value: confidence.clamp(0.0, 1.0),
+                  minHeight: 6,
+                  backgroundColor: Colors.grey.shade700,
+                  valueColor: AlwaysStoppedAnimation<Color>(primaryGreen),
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                'Confidence: ${(confidence * 100).toStringAsFixed(0)}%',
+                style: TextStyle(color: Colors.grey[400], fontSize: 12),
+              ),
+            ],
+          ),
+          trailing: ElevatedButton(
+            onPressed: onAdd,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: primaryGreen,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+              padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 8),
+              elevation: 0,
+              textStyle: const TextStyle(
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            child: const Text(
+              'Add',
+              style: TextStyle(color: Colors.white),
+            ),
           ),
         ),
       ),

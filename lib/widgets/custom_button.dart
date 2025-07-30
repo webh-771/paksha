@@ -24,14 +24,14 @@ class CustomButton extends StatelessWidget {
       child: ElevatedButton(
         onPressed: onPressed,
         style: ElevatedButton.styleFrom(
-          backgroundColor: isPrimary ? AppColors.primarySaffron : Colors.white,
-          foregroundColor: isPrimary ? Colors.white : AppColors.primarySaffron,
+          backgroundColor: isPrimary ? AppColors.primaryDarkGreen : Colors.white,
+          foregroundColor: isPrimary ? Colors.white : AppColors.primaryMintGreen,
           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(30),
             side: isPrimary
                 ? BorderSide.none
-                : const BorderSide(color: AppColors.primarySaffron),
+                : const BorderSide(color: AppColors.primaryDarkGreen),
           ),
           elevation: isPrimary ? 2 : 0,
         ),

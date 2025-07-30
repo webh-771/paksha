@@ -39,21 +39,16 @@ class _HomePageState extends State<HomePage> {
     _loadBudgetData();
   }
 
-  // Load user profile data
   Future<void> _loadUserData() async {
     if (_currentUser != null) {
       try {
-        final userDoc = await _firestore.collection('users').doc(_currentUser!.uid).get();
-        if (userDoc.exists) {
-          // You can load user preferences here if needed
-        }
+        await _firestore.collection('users').doc(_currentUser!.uid).get();
       } catch (e) {
         debugPrint('Error loading user data: $e');
       }
     }
   }
 
-  // Load pantry items that are low or out of stock
   Future<void> _loadPantryAlerts() async {
     if (_currentUser != null) {
       try {
@@ -61,7 +56,7 @@ class _HomePageState extends State<HomePage> {
             .collection('users')
             .doc(_currentUser!.uid)
             .collection('pantry')
-            .where('quantity', isLessThanOrEqualTo: 2) // Items with low quantity
+            .where('quantity', isLessThanOrEqualTo: 2)
             .get();
 
         final List<Map<String, dynamic>> alerts = [];
@@ -96,14 +91,12 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
-  // Load quick recipe suggestions
   Future<void> _loadQuickRecipes() async {
     if (_currentUser != null) {
       try {
-        // Get user's recent recipe views to suggest similar ones
         final recipesSnapshot = await _firestore
             .collection('recipes')
-            .limit(3) // Only get a few recipes for quick display
+            .limit(3)
             .get();
 
         final List<Map<String, dynamic>> recipes = [];
@@ -127,7 +120,6 @@ class _HomePageState extends State<HomePage> {
         debugPrint('Error loading recipes: $e');
         setState(() {
           _loadingRecipes = false;
-          // Use fallback recipes if needed
           _quickRecipes = [
             {
               'id': '1',
@@ -143,6 +135,13 @@ class _HomePageState extends State<HomePage> {
               'cost': '₹65',
               'image': 'https://via.placeholder.com/150',
             },
+            {
+              'id': '3',
+              'name': 'Veg Soup',
+              'time': '18 min',
+              'cost': '₹45',
+              'image': 'https://via.placeholder.com/150',
+            },
           ];
         });
       }
@@ -153,20 +152,16 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
-  // Load budget data
   Future<void> _loadBudgetData() async {
     if (_currentUser != null) {
       try {
-        // Get the current week's budget
         final now = DateTime.now();
         final startOfWeek = DateTime(now.year, now.month, now.day - now.weekday + 1);
         final endOfWeek = startOfWeek.add(const Duration(days: 6));
 
-        // Format dates for Firestore query
         final startDate = DateFormat('yyyy-MM-dd').format(startOfWeek);
         final endDate = DateFormat('yyyy-MM-dd').format(endOfWeek);
 
-        // Get budget document
         final budgetDoc = await _firestore
             .collection('users')
             .doc(_currentUser!.uid)
@@ -174,7 +169,6 @@ class _HomePageState extends State<HomePage> {
             .doc(startDate)
             .get();
 
-        // Get expenses within date range
         final expensesSnapshot = await _firestore
             .collection('users')
             .doc(_currentUser!.uid)
@@ -183,7 +177,6 @@ class _HomePageState extends State<HomePage> {
             .where('date', isLessThanOrEqualTo: endDate)
             .get();
 
-        // Calculate total expenses
         double totalExpenses = 0;
         for (var doc in expensesSnapshot.docs) {
           totalExpenses += (doc.data()['amount'] ?? 0).toDouble();
@@ -209,11 +202,9 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
-  // Add item to shopping list
   Future<void> _addToShoppingList(String itemName) async {
     if (_currentUser != null) {
       try {
-        // First check if item already exists in shopping list
         final existingItemQuery = await _firestore
             .collection('users')
             .doc(_currentUser!.uid)
@@ -223,7 +214,6 @@ class _HomePageState extends State<HomePage> {
             .get();
 
         if (existingItemQuery.docs.isNotEmpty) {
-          // Item exists, update quantity
           final docId = existingItemQuery.docs.first.id;
           final currentQuantity = existingItemQuery.docs.first.data()['quantity'] ?? 0;
 
@@ -237,7 +227,6 @@ class _HomePageState extends State<HomePage> {
             'updatedAt': FieldValue.serverTimestamp(),
           });
         } else {
-          // Item doesn't exist, add new item
           await _firestore
               .collection('users')
               .doc(_currentUser!.uid)
@@ -251,14 +240,18 @@ class _HomePageState extends State<HomePage> {
           });
         }
 
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('$itemName added to shopping list')),
-        );
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('$itemName added to shopping list')),
+          );
+        }
       } catch (e) {
         debugPrint('Error adding to shopping list: $e');
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Failed to add item to shopping list')),
-        );
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Failed to add item to shopping list')),
+          );
+        }
       }
     }
   }
@@ -268,29 +261,31 @@ class _HomePageState extends State<HomePage> {
     final String userName = _currentUser?.displayName ?? 'Chef';
     final double budgetPercentage = _weeklyBudget > 0 ? _spentAmount / _weeklyBudget : 0;
 
-    // Theme colors based on style guide
-    final Color primaryColor = const Color(0xFFE67E22); // Deep Saffron
-    final Color accentColor = const Color(0xFFA3C6A0);  // Mint Green
-    final Color neutralBase = const Color(0xFFFDF6EC);  // Soft Beige
+    // Theme colors matching the new dark green design:
+    const Color backgroundColor = Color(0xFF1B2B1B);        // Outer background
+    const Color cardColor = Color(0xFF2A3B2A);              // Main container color
+    const Color primaryGreen = Color(0xFF4CAF50);           // Bright accent
+    const Color textPrimary = Colors.white;
+    const Color textSecondary = Color(0xFFB0B0B0);
+    const Color inputBackground = Color(0xFF3A4B3A);
 
     return Scaffold(
-      backgroundColor: neutralBase,
+      backgroundColor: backgroundColor,
       body: SafeArea(
-        child: CustomScrollView(
-          slivers: [
-            // App Bar
-            SliverAppBar(
-              floating: true,
-              backgroundColor: neutralBase,
-              elevation: 0,
-              title: Row(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(20.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Header Row
+              Row(
                 children: [
                   CircleAvatar(
-                    backgroundColor: primaryColor.withOpacity(0.2),
+                    backgroundColor: primaryGreen,
                     child: Text(
                       userName.isNotEmpty ? userName[0].toUpperCase() : 'P',
-                      style: TextStyle(
-                        color: primaryColor,
+                      style: const TextStyle(
+                        color: Colors.white,
                         fontWeight: FontWeight.bold,
                       ),
                     ),
@@ -300,582 +295,311 @@ class _HomePageState extends State<HomePage> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'Namaste, $userName!',
+                        'Paksha',
                         style: const TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w600,
-                          color: Color(0xFF2C3E50),
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold,
+                          color: textPrimary,
                         ),
                       ),
                       Text(
-                        'What would you like to cook today?',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: Colors.grey[600],
-                          fontWeight: FontWeight.normal,
+                        'Hello, $userName!',
+                        style: const TextStyle(
+                          fontSize: 14,
+                          color: textSecondary,
                         ),
                       ),
                     ],
                   ),
+                  const Spacer(),
+                  IconButton(
+                    icon: const Icon(Icons.settings_outlined, color: textPrimary),
+                    onPressed: () async {
+                      await AuthService().logout();
+                      if (context.mounted) context.go('/login');
+                    },
+                  ),
                 ],
               ),
-              actions: [
-                IconButton(
-                  icon: const Icon(Icons.notifications_outlined, color: Color(0xFF2C3E50)),
-                  onPressed: () {
-                    // Notifications page
-                  },
-                ),
-                IconButton(
-                  icon: const Icon(Icons.settings_outlined, color: Color(0xFF2C3E50)),
-                  onPressed: () async {
-                    // Settings page
-                    await AuthService().logout();
-                    if (context.mounted) {
-                      context.go('/login');
-                    }
-                  },
-                ),
-              ],
-            ),
 
-            // Main content
-            SliverToBoxAdapter(
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16.0),
+              const SizedBox(height: 28),
+
+              // QUICK ACTION BUTTONS ROW
+              _QuickActionsBar(),
+
+              const SizedBox(height: 32),
+
+              // BUDGET TRACKER
+              Container(
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  color: cardColor,
+                  borderRadius: BorderRadius.circular(16),
+                ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // Search + Voice/Image input
-                    Container(
-                      margin: const EdgeInsets.symmetric(vertical: 16),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(16),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.grey.withOpacity(0.1),
-                            spreadRadius: 1,
-                            blurRadius: 5,
-                            offset: const Offset(0, 1),
-                          ),
-                        ],
-                      ),
-                      child: Row(
-                        children: [
-                          Expanded(
-                            child: TextField(
-                              decoration: InputDecoration(
-                                hintText: 'Search recipes or ingredients...',
-                                border: InputBorder.none,
-                                contentPadding: const EdgeInsets.symmetric(horizontal: 16),
-                                hintStyle: TextStyle(color: Colors.grey[400]),
-                              ),
-                            ),
-                          ),
-                          Container(
-                            padding: const EdgeInsets.all(8),
-                            margin: const EdgeInsets.only(right: 8),
-                            decoration: BoxDecoration(
-                              color: accentColor,
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: const Icon(
-                              Icons.camera_alt_outlined,
-                              color: Colors.white,
-                              size: 20,
-                            ),
-                          ),
-                          Container(
-                            padding: const EdgeInsets.all(8),
-                            margin: const EdgeInsets.only(right: 8),
-                            decoration: BoxDecoration(
-                              color: primaryColor,
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: const Icon(
-                              Icons.mic_outlined,
-                              color: Colors.white,
-                              size: 20,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-
-                    // Quick actions
-                    const SizedBox(height: 16),
-                    Container(
-                      padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          colors: [primaryColor, primaryColor.withOpacity(0.8)],
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                        ),
-                        borderRadius: BorderRadius.circular(16),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Text(
-                            'What can I cook with my pantry?',
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          const Text(
-                            'Get smart recipes using what you already have',
-                            style: TextStyle(
-                              color: Colors.white70,
-                              fontSize: 14,
-                            ),
-                          ),
-                          const SizedBox(height: 16),
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceAround,
-                            children: [
-                              _buildQuickAction(
-                                icon: Icons.restaurant_menu,
-                                label: 'Recipe\nGenerator',
-                                onTap: () => context.push('/recipe-generator'),
-                              ),
-                              _buildQuickAction(
-                                icon: Icons.shopping_basket_outlined,
-                                label: 'My\nPantry',
-                                onTap: () => context.push('/pantry'),
-                              ),
-                              _buildQuickAction(
-                                icon: Icons.shopping_cart_outlined,
-                                label: 'Shopping\nList',
-                                onTap: () => context.push('/shopping-list'),
-                              ),
-                              _buildQuickAction(
-                                icon: Icons.calendar_today_outlined,
-                                label: 'Meal\nPlanner',
-                                onTap: () => context.push('/meal-planner'),
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
-                    ),
-
-                    // Budget section
-                    const SizedBox(height: 24),
                     const Text(
-                      'Weekly Budget Tracker',
+                      'Budget Tracker',
                       style: TextStyle(
                         fontSize: 18,
                         fontWeight: FontWeight.bold,
-                        color: Color(0xFF2C3E50),
+                        color: textPrimary,
                       ),
                     ),
-                    const SizedBox(height: 12),
+                    const SizedBox(height: 16),
                     _loadingBudget
                         ? const Center(child: CircularProgressIndicator())
-                        : Container(
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(16),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.grey.withOpacity(0.1),
-                            spreadRadius: 1,
-                            blurRadius: 5,
-                            offset: const Offset(0, 1),
-                          ),
-                        ],
-                      ),
-                      child: Row(
-                        children: [
-                          CircularPercentIndicator(
-                            radius: 60.0,
-                            lineWidth: 10.0,
-                            percent: budgetPercentage > 1.0 ? 1.0 : budgetPercentage,
-                            center: Column(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Text(
-                                  '${(budgetPercentage * 100).toInt()}%',
-                                  style: const TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 18.0,
-                                  ),
-                                ),
-                                Text(
-                                  'Used',
-                                  style: TextStyle(
-                                    fontSize: 12.0,
-                                    color: Colors.grey[600],
-                                  ),
-                                ),
-                              ],
-                            ),
-                            progressColor: budgetPercentage > 0.8
-                                ? Colors.red
-                                : budgetPercentage > 0.6
-                                ? Colors.amber
-                                : accentColor,
-                            backgroundColor: Colors.grey[200]!,
-                          ),
-                          const SizedBox(width: 20),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  'Budget: ₹${_weeklyBudget.toInt()}',
-                                  style: const TextStyle(
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.bold,
-                                    color: Color(0xFF2C3E50),
-                                  ),
-                                ),
-                                const SizedBox(height: 8),
-                                Text(
-                                  'Spent: ₹${_spentAmount.toInt()}',
-                                  style: TextStyle(
-                                    fontSize: 14,
-                                    color: Colors.grey[700],
-                                  ),
-                                ),
-                                const SizedBox(height: 8),
-                                Text(
-                                  'Remaining: ₹${(_weeklyBudget - _spentAmount).toInt()}',
-                                  style: TextStyle(
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.w500,
-                                    color: budgetPercentage > 0.8 ? Colors.red : Colors.green[700],
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-
-                    // Quick recipe suggestions
-                    const SizedBox(height: 24),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        : Row(
                       children: [
-                        const Text(
-                          'Quick Recipes For You',
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                            color: Color(0xFF2C3E50),
+                        CircularPercentIndicator(
+                          radius: 48.0,
+                          lineWidth: 8.0,
+                          percent: budgetPercentage.clamp(0.0, 1.0),
+                          center: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                '${(budgetPercentage * 100).toInt()}%',
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 16.0,
+                                  color: textPrimary,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                'Used',
+                                style: TextStyle(
+                                  fontSize: 12.0,
+                                  color: textSecondary,
+                                ),
+                              ),
+                            ],
                           ),
+                          progressColor: budgetPercentage > 0.8
+                              ? Colors.red
+                              : budgetPercentage > 0.6
+                              ? Colors.amber
+                              : primaryGreen,
+                          backgroundColor: inputBackground,
                         ),
-                        TextButton(
-                          onPressed: () => context.push('/recipes'),
-                          child: Text(
-                            'See All',
-                            style: TextStyle(
-                              color: primaryColor,
-                              fontWeight: FontWeight.w600,
-                            ),
+                        const SizedBox(width: 20),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Budget: ₹${_weeklyBudget.toInt()}',
+                                style: const TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                  color: textPrimary,
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                              Text(
+                                'Spent: ₹${_spentAmount.toInt()}',
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  color: textSecondary,
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                              Text(
+                                'Remain: ₹${(_weeklyBudget - _spentAmount).toInt()}',
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w500,
+                                  color: budgetPercentage > 0.8 ? Colors.red : primaryGreen,
+                                ),
+                              ),
+                            ],
                           ),
                         ),
                       ],
                     ),
-                    const SizedBox(height: 12),
-                    _loadingRecipes
-                        ? const Center(child: CircularProgressIndicator())
-                        : _quickRecipes.isEmpty
-                        ? Center(
-                      child: Text(
-                        'No recipes available',
-                        style: TextStyle(color: Colors.grey[600]),
-                      ),
-                    )
-                        : SizedBox(
-                      height: 180,
-                      child: ListView.builder(
-                        scrollDirection: Axis.horizontal,
-                        itemCount: _quickRecipes.length,
-                        itemBuilder: (context, index) {
-                          final recipe = _quickRecipes[index];
-                          return Container(
-                            width: 160,
-                            margin: const EdgeInsets.only(right: 16),
-                            decoration: BoxDecoration(
-                              color: Colors.white,
-                              borderRadius: BorderRadius.circular(16),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Colors.grey.withOpacity(0.1),
-                                  spreadRadius: 1,
-                                  blurRadius: 5,
-                                  offset: const Offset(0, 1),
-                                ),
-                              ],
-                            ),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                ClipRRect(
-                                  borderRadius: const BorderRadius.only(
-                                    topLeft: Radius.circular(16),
-                                    topRight: Radius.circular(16),
-                                  ),
-                                  child: Container(
-                                    height: 100,
-                                    width: double.infinity,
-                                    color: primaryColor.withOpacity(0.2),
-                                    child: Center(
-                                      child: Icon(
-                                        Icons.restaurant,
-                                        color: primaryColor,
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                                Padding(
-                                  padding: const EdgeInsets.all(12.0),
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        recipe['name'],
-                                        style: const TextStyle(
-                                          fontWeight: FontWeight.bold,
-                                          fontSize: 14,
-                                        ),
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
-                                      ),
-                                      const SizedBox(height: 4),
-                                      Row(
-                                        children: [
-                                          Icon(
-                                            Icons.access_time,
-                                            size: 14,
-                                            color: Colors.grey[600],
-                                          ),
-                                          const SizedBox(width: 4),
-                                          Text(
-                                            recipe['time'],
-                                            style: TextStyle(
-                                              fontSize: 12,
-                                              color: Colors.grey[600],
-                                            ),
-                                          ),
-                                          const SizedBox(width: 8),
-                                          Icon(
-                                            Icons.currency_rupee,
-                                            size: 14,
-                                            color: Colors.grey[600],
-                                          ),
-                                          Text(
-                                            recipe['cost'],
-                                            style: TextStyle(
-                                              fontSize: 12,
-                                              color: Colors.grey[600],
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ],
-                            ),
-                          );
-                        },
-                      ),
-                    ),
+                  ],
+                ),
+              ),
 
-                    // Pantry alerts
-                    if (!_loadingPantry && _pantryAlerts.isNotEmpty) ...[
-                      const SizedBox(height: 24),
-                      const Text(
-                        'Pantry Alerts',
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                          color: Color(0xFF2C3E50),
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      Container(
-                        padding: const EdgeInsets.all(16),
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(16),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.grey.withOpacity(0.1),
-                              spreadRadius: 1,
-                              blurRadius: 5,
-                              offset: const Offset(0, 1),
-                            ),
-                          ],
-                        ),
-                        child: Column(
-                          children: _pantryAlerts.map((alert) {
-                            return Padding(
-                              padding: const EdgeInsets.only(bottom: 12.0),
-                              child: Row(
-                                children: [
-                                  Icon(
-                                    alert['icon'] as IconData,
-                                    color: alert['color'] as Color,
-                                    size: 20,
-                                  ),
-                                  const SizedBox(width: 12),
-                                  Text(
-                                    '${alert['item']} is ${alert['status']}',
-                                    style: const TextStyle(
-                                      fontSize: 14,
-                                      fontWeight: FontWeight.w500,
-                                    ),
-                                  ),
-                                  const Spacer(),
-                                  TextButton(
-                                    onPressed: () {
-                                      _addToShoppingList(alert['item']);
-                                    },
-                                    style: TextButton.styleFrom(
-                                      backgroundColor: primaryColor.withOpacity(0.1),
-                                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                                      shape: RoundedRectangleBorder(
-                                        borderRadius: BorderRadius.circular(8),
-                                      ),
-                                    ),
-                                    child: Text(
-                                      'Add to List',
-                                      style: TextStyle(
-                                        color: primaryColor,
-                                        fontSize: 12,
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            );
-                          }).toList(),
-                        ),
-                      ),
-                    ],
+              const SizedBox(height: 32),
 
-                    // Smart Assistant
-                    const SizedBox(height: 24),
-                    Container(
+              // QUICK RECIPES
+              const Text(
+                'Quick Recipes',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: textPrimary,
+                ),
+              ),
+              const SizedBox(height: 18),
+              _loadingRecipes
+                  ? const Center(child: CircularProgressIndicator())
+                  : _quickRecipes.isEmpty
+                  ? const Center(
+                child: Text(
+                  'No recipes available',
+                  style: TextStyle(color: textSecondary),
+                ),
+              )
+                  : Row(
+                children: _quickRecipes.take(3).map((recipe) {
+                  final index = _quickRecipes.indexOf(recipe);
+                  return Expanded(
+                    child: Container(
+                      margin: EdgeInsets.only(
+                        right: index < 2 ? 12 : 0,
+                      ),
                       padding: const EdgeInsets.all(16),
-                      margin: const EdgeInsets.only(bottom: 24),
                       decoration: BoxDecoration(
-                        color: accentColor.withOpacity(0.2),
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(
-                          color: accentColor.withOpacity(0.5),
-                          width: 1,
-                        ),
+                        color: cardColor,
+                        borderRadius: BorderRadius.circular(12),
                       ),
-                      child: Row(
+                      child: Column(
                         children: [
                           Container(
-                            padding: const EdgeInsets.all(10),
+                            height: 80,
+                            width: double.infinity,
                             decoration: BoxDecoration(
-                              color: accentColor,
-                              shape: BoxShape.circle,
+                              color: inputBackground,
+                              borderRadius: BorderRadius.circular(8),
                             ),
-                            child: const Icon(
-                              Icons.smart_toy_outlined,
-                              color: Colors.white,
-                              size: 24,
-                            ),
-                          ),
-                          const SizedBox(width: 16),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                const Text(
-                                  'Smart Kitchen Assistant',
-                                  style: TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 16,
-                                  ),
-                                ),
-                                const SizedBox(height: 4),
-                                Text(
-                                  'Get personalized cooking tips & ingredient substitutions',
-                                  style: TextStyle(
-                                    fontSize: 14,
-                                    color: Colors.grey[700],
-                                  ),
-                                ),
-                              ],
+                            child: Center(
+                              child: Icon(
+                                Icons.restaurant,
+                                color: textSecondary,
+                                size: 32,
+                              ),
                             ),
                           ),
-                          IconButton(
-                            icon: const Icon(Icons.arrow_forward_ios, size: 16),
-                            onPressed: () => context.push('/ai-assistant'),
+                          const SizedBox(height: 10),
+                          Text(
+                            recipe['name'],
+                            style: const TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
+                              color: textPrimary,
+                            ),
+                            textAlign: TextAlign.center,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
                           ),
                         ],
                       ),
                     ),
-                  ],
-                ),
+                  );
+                }).toList(),
               ),
-            ),
-          ],
+
+              const SizedBox(height: 32),
+
+              // Pantry alerts
+              if (!_loadingPantry && _pantryAlerts.isNotEmpty) ...[
+                const Text(
+                  'Pantry Alerts',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: textPrimary,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: cardColor,
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: Column(
+                    children: _pantryAlerts.map((alert) {
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 12.0),
+                        child: Row(
+                          children: [
+                            Icon(
+                              alert['icon'] as IconData,
+                              color: alert['color'] as Color,
+                              size: 20,
+                            ),
+                            const SizedBox(width: 12),
+                            Text(
+                              '${alert['item']} is ${alert['status']}',
+                              style: const TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w500,
+                                color: textPrimary,
+                              ),
+                            ),
+                            const Spacer(),
+                            TextButton(
+                              onPressed: () {
+                                _addToShoppingList(alert['item']);
+                              },
+                              style: TextButton.styleFrom(
+                                backgroundColor: primaryGreen.withOpacity(0.18),
+                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                              ),
+                              child: const Text(
+                                'Add to List',
+                                style: TextStyle(
+                                  color: primaryGreen,
+                                  fontSize: 12,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    }).toList(),
+                  ),
+                ),
+              ],
+
+              const SizedBox(height: 32),
+            ],
+          ),
         ),
       ),
       bottomNavigationBar: BottomNavigationBar(
-        selectedItemColor: primaryColor,
-        unselectedItemColor: Colors.grey[600],
+        backgroundColor: backgroundColor,
+        selectedItemColor: primaryGreen,
+        unselectedItemColor: textSecondary,
         type: BottomNavigationBarType.fixed,
         items: const [
           BottomNavigationBarItem(
-            icon: Icon(Icons.home_outlined),
-            activeIcon: Icon(Icons.home),
+            icon: Icon(Icons.home),
             label: 'Home',
           ),
           BottomNavigationBarItem(
-            icon: Icon(Icons.restaurant_menu_outlined),
-            activeIcon: Icon(Icons.restaurant_menu),
+            icon: Icon(Icons.restaurant_menu),
             label: 'Recipes',
           ),
           BottomNavigationBarItem(
-            icon: Icon(Icons.shopping_basket_outlined),
-            activeIcon: Icon(Icons.shopping_basket),
-            label: 'Pantry',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.shopping_cart_outlined),
-            activeIcon: Icon(Icons.shopping_cart),
+            icon: Icon(Icons.shopping_cart),
             label: 'Shopping',
           ),
           BottomNavigationBarItem(
-            icon: Icon(Icons.person_outline),
-            activeIcon: Icon(Icons.person),
+            icon: Icon(Icons.person),
             label: 'Profile',
           ),
         ],
         currentIndex: 0,
         onTap: (index) {
-          // Handle navigation
           switch (index) {
-            case 0: // Already on home
+            case 0:
               break;
             case 1:
               context.push('/recipes');
               break;
             case 2:
-              context.push('/pantry');
-              break;
-            case 3:
               context.push('/shopping-list');
               break;
-            case 4:
+            case 3:
               context.push('/profile');
               break;
           }
@@ -883,37 +607,91 @@ class _HomePageState extends State<HomePage> {
       ),
     );
   }
+}
 
-  Widget _buildQuickAction({
-    required IconData icon,
-    required String label,
-    required VoidCallback onTap,
-  }) {
-    return InkWell(
+class _QuickActionsBar extends StatelessWidget {
+  const _QuickActionsBar({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    const Color cardColor = Color(0xFF2A3B2A);
+    const Color inputBackground = Color(0xFF3A4B3A);
+    const Color primaryGreen = Color(0xFF4CAF50);
+    const Color textPrimary = Colors.white;
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        _QuickActionBtn(
+          icon: Icons.auto_awesome,
+          label: "Generator",
+          onTap: () => context.push('/recipe-generator'),
+        ),
+        _QuickActionBtn(
+          icon: Icons.shopping_basket_outlined,
+          label: "My Pantry",
+          onTap: () => context.push('/pantry'),
+        ),
+        _QuickActionBtn(
+          icon: Icons.shopping_cart_outlined,
+          label: "Shop List",
+          onTap: () => context.push('/shopping-list'),
+        ),
+        _QuickActionBtn(
+          icon: Icons.calendar_today_outlined,
+          label: "Meal Plan",
+          onTap: () => context.push('/meal-planner'),
+        ),
+        _QuickActionBtn(
+          icon: Icons.smart_toy_outlined,
+          label: "Assistant",
+          onTap: () => context.push('/ai-assistant'),
+        ),
+      ],
+    );
+  }
+}
+
+class _QuickActionBtn extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
+
+  const _QuickActionBtn({
+    required this.icon,
+    required this.label,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    const Color inputBackground = Color(0xFF3A4B3A);
+    const Color primaryGreen = Color(0xFF4CAF50);
+    const Color textPrimary = Colors.white;
+
+    return GestureDetector(
       onTap: onTap,
       child: Column(
         children: [
           Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: inputBackground,
               borderRadius: BorderRadius.circular(12),
             ),
-            child: Icon(
-              icon,
-              color: const Color(0xFFE67E22),
-              size: 24,
-            ),
+            child: Icon(icon, color: primaryGreen, size: 26),
           ),
           const SizedBox(height: 8),
-          Text(
-            label,
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 12,
-              fontWeight: FontWeight.w500,
+          SizedBox(
+            width: 64,
+            child: Text(
+              label,
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                color: textPrimary,
+                fontSize: 12,
+                fontWeight: FontWeight.w500,
+              ),
             ),
-            textAlign: TextAlign.center,
           ),
         ],
       ),

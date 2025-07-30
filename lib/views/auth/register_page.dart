@@ -15,21 +15,54 @@ class _RegisterPageState extends State<RegisterPage> {
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
   final TextEditingController _confirmPasswordController = TextEditingController();
+  final TextEditingController _usernameController = TextEditingController();
+  final TextEditingController _phoneController = TextEditingController();
   bool _isLoading = false;
   bool _obscurePassword = true;
   bool _obscureConfirmPassword = true;
+  bool _agreeToTerms = false;
+  String _selectedGender = 'Male';
+  String _selectedCountry = 'India';
 
-  // Theme colors
-  final Color _primaryColor = const Color(0xFFE67E22); // Deep Saffron
-  final Color _accentColor = const Color(0xFFA3C6A0);  // Mint Green
-  final Color _neutralColor = const Color(0xFFFDF6EC); // Soft Beige
+  // Dark theme colors matching the image
+  final Color _backgroundColor = const Color(0xFF1B2B1B); // Dark green background
+  final Color _cardColor = const Color(0xFF2A3B2A);       // Darker green for cards
+  final Color _primaryGreen = const Color(0xFF4CAF50);    // Bright green for buttons
+  final Color _textPrimary = Colors.white;
+  final Color _textSecondary = const Color(0xFFB0B0B0);
+  final Color _inputBackground = const Color(0xFF3A4B3A); // Input field background
 
   void _register() async {
+    if (_emailController.text.isEmpty ||
+        _passwordController.text.isEmpty ||
+        _usernameController.text.isEmpty ||
+        _phoneController.text.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text("Please fill all fields"),
+          backgroundColor: Colors.red,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
+
     if (_passwordController.text != _confirmPasswordController.text) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: const Text("Passwords do not match!"),
-          backgroundColor: Colors.redAccent,
+          backgroundColor: Colors.red,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
+
+    if (!_agreeToTerms) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text("Please agree to terms and privacy policy"),
+          backgroundColor: Colors.red,
           behavior: SnackBarBehavior.floating,
         ),
       );
@@ -50,12 +83,12 @@ class _RegisterPageState extends State<RegisterPage> {
     });
 
     if (user != null) {
-      context.go('/home'); // Navigate to home page after successful registration
+      context.go('/home');
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: const Text("Registration failed!"),
-          backgroundColor: Colors.redAccent,
+          backgroundColor: Colors.red,
           behavior: SnackBarBehavior.floating,
         ),
       );
@@ -65,300 +98,416 @@ class _RegisterPageState extends State<RegisterPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: _neutralColor,
+      backgroundColor: _backgroundColor,
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
-        title: Text(
-          'Register',
-          style: GoogleFonts.poppins(
-            color: const Color(0xFF2C3E50),
-            fontWeight: FontWeight.w600,
-          ),
-        ),
         leading: IconButton(
-          icon: Icon(Icons.arrow_back_ios, color: const Color(0xFF2C3E50)),
+          icon: Icon(Icons.arrow_back, color: _textPrimary),
           onPressed: () => context.go('/login'),
         ),
       ),
       body: SafeArea(
         child: SingleChildScrollView(
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 24.0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                const SizedBox(height: 20),
-                // App Logo or Icon
-                Center(
-                  child: Container(
-                    height: 80,
-                    width: 80,
-                    decoration: BoxDecoration(
-                      color: _primaryColor,
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: const Icon(
-                      Icons.restaurant,
-                      size: 50,
-                      color: Colors.white,
-                    ),
-                  ),
+          padding: const EdgeInsets.symmetric(horizontal: 24.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Top section
+              Text(
+                'Register Page',
+                style: GoogleFonts.inter(
+                  fontSize: 14,
+                  color: _textSecondary,
                 ),
+              ),
 
-                const SizedBox(height: 16),
-                // App Name with Hindi subtitle
-                Column(
+              const SizedBox(height: 24),
+
+              // Title
+              Text(
+                'Join Paksha Family',
+                style: GoogleFonts.poppins(
+                  fontSize: 24,
+                  fontWeight: FontWeight.bold,
+                  color: _textPrimary,
+                ),
+              ),
+
+              const SizedBox(height: 8),
+
+              Text(
+                'Create your account to start your culinary journey',
+                style: GoogleFonts.inter(
+                  fontSize: 14,
+                  color: _textSecondary,
+                ),
+              ),
+
+              const SizedBox(height: 32),
+
+              // Email field
+              _buildInputField(
+                controller: _emailController,
+                hintText: 'Email',
+                keyboardType: TextInputType.emailAddress,
+              ),
+
+              const SizedBox(height: 16),
+
+              // Password field
+              _buildPasswordField(
+                controller: _passwordController,
+                hintText: 'Password',
+                obscureText: _obscurePassword,
+                onToggle: () => setState(() => _obscurePassword = !_obscurePassword),
+              ),
+
+              const SizedBox(height: 16),
+
+              // Password strength indicator
+              Container(
+                height: 4,
+                decoration: BoxDecoration(
+                  color: _inputBackground,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+                child: Stack(
                   children: [
-                    Text(
-                      'Paksha',
-                      style: GoogleFonts.poppins(
-                        fontSize: 28,
-                        fontWeight: FontWeight.bold,
-                        color: const Color(0xFF2C3E50),
+                    Container(
+                      width: double.infinity,
+                      decoration: BoxDecoration(
+                        color: _inputBackground,
+                        borderRadius: BorderRadius.circular(2),
                       ),
                     ),
-                    Text(
-                      'पकशा - Your Smart Kitchen Partner',
-                      style: GoogleFonts.baloo2(
-                        fontSize: 14,
-                        color: const Color(0xFF2C3E50).withOpacity(0.7),
+                    FractionallySizedBox(
+                      widthFactor: _getPasswordStrength(),
+                      child: Container(
+                        decoration: BoxDecoration(
+                          color: _primaryGreen,
+                          borderRadius: BorderRadius.circular(2),
+                        ),
                       ),
                     ),
                   ],
                 ),
+              ),
 
-                const SizedBox(height: 30),
-                // Register Form
-                Container(
-                  padding: const EdgeInsets.all(20),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(16),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withOpacity(0.05),
-                        blurRadius: 15,
-                        offset: const Offset(0, 5),
-                      ),
-                    ],
+              const SizedBox(height: 4),
+
+              // Password requirements
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _buildPasswordRequirement('At least 8 characters', _passwordController.text.length >= 8),
+                  _buildPasswordRequirement('Contains a number', RegExp(r'\d').hasMatch(_passwordController.text)),
+                  _buildPasswordRequirement('Contains a special character', RegExp(r'[!@#$%^&*(),.?":{}|<>]').hasMatch(_passwordController.text)),
+                ],
+              ),
+
+              const SizedBox(height: 16),
+
+              // Username field
+              _buildInputField(
+                controller: _usernameController,
+                hintText: 'Username',
+              ),
+
+              const SizedBox(height: 16),
+
+              // Phone field
+              _buildInputField(
+                controller: _phoneController,
+                hintText: 'Phone Number',
+                keyboardType: TextInputType.phone,
+              ),
+
+              const SizedBox(height: 16),
+
+              // Gender selection
+              Row(
+                children: [
+                  Expanded(
+                    child: _buildGenderButton('Male'),
                   ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Create Account',
-                        style: GoogleFonts.poppins(
-                          fontSize: 20,
-                          fontWeight: FontWeight.w600,
-                          color: const Color(0xFF2C3E50),
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        'Start your culinary journey with us',
-                        style: GoogleFonts.inter(
-                          fontSize: 14,
-                          color: Colors.grey,
-                        ),
-                      ),
-                      const SizedBox(height: 20),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: _buildGenderButton('Female'),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: _buildGenderButton('Other'),
+                  ),
+                ],
+              ),
 
-                      // Email Field
-                      TextField(
-                        controller: _emailController,
-                        keyboardType: TextInputType.emailAddress,
-                        style: GoogleFonts.inter(),
-                        decoration: InputDecoration(
-                          contentPadding: const EdgeInsets.symmetric(
-                            horizontal: 16,
-                            vertical: 16,
-                          ),
-                          hintText: 'Email',
-                          prefixIcon: Icon(
-                            Icons.email_outlined,
-                            color: _primaryColor,
-                          ),
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
-                            borderSide: BorderSide.none,
-                          ),
-                          filled: true,
-                          fillColor: Colors.grey.shade100,
-                        ),
-                      ),
+              const SizedBox(height: 16),
 
-                      const SizedBox(height: 16),
-
-                      // Password Field
-                      TextField(
-                        controller: _passwordController,
-                        obscureText: _obscurePassword,
-                        style: GoogleFonts.inter(),
-                        decoration: InputDecoration(
-                          contentPadding: const EdgeInsets.symmetric(
-                            horizontal: 16,
-                            vertical: 16,
-                          ),
-                          hintText: 'Password',
-                          prefixIcon: Icon(
-                            Icons.lock_outline,
-                            color: _primaryColor,
-                          ),
-                          suffixIcon: IconButton(
-                            icon: Icon(
-                              _obscurePassword
-                                  ? Icons.visibility_off_outlined
-                                  : Icons.visibility_outlined,
-                              color: Colors.grey,
-                            ),
-                            onPressed: () {
-                              setState(() {
-                                _obscurePassword = !_obscurePassword;
-                              });
-                            },
-                          ),
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
-                            borderSide: BorderSide.none,
-                          ),
-                          filled: true,
-                          fillColor: Colors.grey.shade100,
-                        ),
-                      ),
-
-                      const SizedBox(height: 16),
-
-                      // Confirm Password Field
-                      TextField(
-                        controller: _confirmPasswordController,
-                        obscureText: _obscureConfirmPassword,
-                        style: GoogleFonts.inter(),
-                        decoration: InputDecoration(
-                          contentPadding: const EdgeInsets.symmetric(
-                            horizontal: 16,
-                            vertical: 16,
-                          ),
-                          hintText: 'Confirm Password',
-                          prefixIcon: Icon(
-                            Icons.lock_outline,
-                            color: _primaryColor,
-                          ),
-                          suffixIcon: IconButton(
-                            icon: Icon(
-                              _obscureConfirmPassword
-                                  ? Icons.visibility_off_outlined
-                                  : Icons.visibility_outlined,
-                              color: Colors.grey,
-                            ),
-                            onPressed: () {
-                              setState(() {
-                                _obscureConfirmPassword = !_obscureConfirmPassword;
-                              });
-                            },
-                          ),
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
-                            borderSide: BorderSide.none,
-                          ),
-                          filled: true,
-                          fillColor: Colors.grey.shade100,
-                        ),
-                      ),
-
-                      const SizedBox(height: 16),
-
-                      // Terms and Conditions
-                      Row(
-                        children: [
-                          Icon(
-                            Icons.check_circle,
-                            color: _accentColor,
-                            size: 20,
-                          ),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: Text(
-                              'By signing up, you agree to our Terms & Conditions',
-                              style: GoogleFonts.inter(
-                                fontSize: 12,
-                                color: Colors.grey.shade700,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-
-                      const SizedBox(height: 24),
-
-                      // Register Button
-                      SizedBox(
-                        height: 56,
-                        width: double.infinity,
-                        child: ElevatedButton(
-                          onPressed: _isLoading ? null : _register,
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: _primaryColor,
-                            foregroundColor: Colors.white,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            elevation: 0,
-                          ),
-                          child: _isLoading
-                              ? SizedBox(
-                            height: 24,
-                            width: 24,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                            ),
-                          )
-                              : Text(
-                            'Register',
-                            style: GoogleFonts.poppins(
-                              fontSize: 16,
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
+              // Country dropdown
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                decoration: BoxDecoration(
+                  color: _inputBackground,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: DropdownButtonHideUnderline(
+                  child: DropdownButton<String>(
+                    value: _selectedCountry,
+                    dropdownColor: _inputBackground,
+                    style: GoogleFonts.inter(color: _textPrimary),
+                    items: ['India', 'USA', 'UK', 'Canada', 'Australia'].map((String country) {
+                      return DropdownMenuItem<String>(
+                        value: country,
+                        child: Text(country),
+                      );
+                    }).toList(),
+                    onChanged: (String? newValue) {
+                      setState(() {
+                        _selectedCountry = newValue!;
+                      });
+                    },
                   ),
                 ),
+              ),
 
-                const SizedBox(height: 24),
+              const SizedBox(height: 16),
 
-                // Already have account option
-                Row(
+              // City field
+              _buildInputField(
+                controller: TextEditingController(), // Add city controller if needed
+                hintText: 'City',
+              ),
+
+              const SizedBox(height: 24),
+
+              // Terms and privacy policy checkbox
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Checkbox(
+                    value: _agreeToTerms,
+                    onChanged: (bool? value) {
+                      setState(() {
+                        _agreeToTerms = value ?? false;
+                      });
+                    },
+                    fillColor: WidgetStateProperty.resolveWith<Color>((Set<WidgetState> states) {
+                      if (states.contains(WidgetState.selected)) {
+                        return _primaryGreen;
+                      }
+                      return Colors.transparent;
+                    }),
+                    side: BorderSide(color: _textSecondary),
+                  ),
+                  Expanded(
+                    child: Padding(
+                      padding: const EdgeInsets.only(top: 12),
+                      child: Text(
+                        'I agree to the terms and privacy policy',
+                        style: GoogleFonts.inter(
+                          fontSize: 14,
+                          color: _textSecondary,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+
+              const SizedBox(height: 24),
+
+              // Register button
+              SizedBox(
+                width: double.infinity,
+                height: 48,
+                child: ElevatedButton(
+                  onPressed: _isLoading ? null : _register,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: _primaryGreen,
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    elevation: 0,
+                  ),
+                  child: _isLoading
+                      ? const SizedBox(
+                    height: 20,
+                    width: 20,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                    ),
+                  )
+                      : Text(
+                    'Register',
+                    style: GoogleFonts.inter(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ),
+              ),
+
+              const SizedBox(height: 24),
+
+              // Login option
+              Center(
+                child: Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     Text(
-                      "Already have an account?",
+                      "Already have an account? ",
                       style: GoogleFonts.inter(
-                        color: Colors.grey.shade700,
+                        color: _textSecondary,
+                        fontSize: 14,
                       ),
                     ),
                     TextButton(
                       onPressed: () => context.go('/login'),
                       style: TextButton.styleFrom(
-                        foregroundColor: _primaryColor,
+                        foregroundColor: _primaryGreen,
+                        padding: EdgeInsets.zero,
                       ),
                       child: Text(
                         'Login here',
-                        style: GoogleFonts.poppins(
+                        style: GoogleFonts.inter(
                           fontWeight: FontWeight.w600,
+                          fontSize: 14,
                         ),
                       ),
                     ),
                   ],
                 ),
-                const SizedBox(height: 20),
-              ],
+              ),
+
+              const SizedBox(height: 24),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildInputField({
+    required TextEditingController controller,
+    required String hintText,
+    TextInputType? keyboardType,
+  }) {
+    return Container(
+      decoration: BoxDecoration(
+        color: _inputBackground,
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: TextField(
+        controller: controller,
+        keyboardType: keyboardType,
+        style: GoogleFonts.inter(color: _textPrimary),
+        decoration: InputDecoration(
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 16,
+            vertical: 16,
+          ),
+          hintText: hintText,
+          hintStyle: GoogleFonts.inter(color: _textSecondary),
+          border: InputBorder.none,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPasswordField({
+    required TextEditingController controller,
+    required String hintText,
+    required bool obscureText,
+    required VoidCallback onToggle,
+  }) {
+    return Container(
+      decoration: BoxDecoration(
+        color: _inputBackground,
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: TextField(
+        controller: controller,
+        obscureText: obscureText,
+        style: GoogleFonts.inter(color: _textPrimary),
+        onChanged: (value) => setState(() {}), // Trigger rebuild for password strength
+        decoration: InputDecoration(
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 16,
+            vertical: 16,
+          ),
+          hintText: hintText,
+          hintStyle: GoogleFonts.inter(color: _textSecondary),
+          border: InputBorder.none,
+          suffixIcon: IconButton(
+            icon: Icon(
+              obscureText ? Icons.visibility_off_outlined : Icons.visibility_outlined,
+              color: _textSecondary,
+            ),
+            onPressed: onToggle,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildGenderButton(String gender) {
+    final isSelected = _selectedGender == gender;
+    return GestureDetector(
+      onTap: () => setState(() => _selectedGender = gender),
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 12),
+        decoration: BoxDecoration(
+          color: isSelected ? _primaryGreen : _inputBackground,
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Center(
+          child: Text(
+            gender,
+            style: GoogleFonts.inter(
+              color: isSelected ? Colors.white : _textSecondary,
+              fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
             ),
           ),
         ),
       ),
     );
+  }
+
+  Widget _buildPasswordRequirement(String text, bool isMet) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 2),
+      child: Row(
+        children: [
+          Icon(
+            isMet ? Icons.check : Icons.close,
+            size: 12,
+            color: isMet ? _primaryGreen : Colors.red,
+          ),
+          const SizedBox(width: 4),
+          Text(
+            text,
+            style: GoogleFonts.inter(
+              fontSize: 12,
+              color: isMet ? _primaryGreen : _textSecondary,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  double _getPasswordStrength() {
+    final password = _passwordController.text;
+    double strength = 0;
+
+    if (password.length >= 8) strength += 0.33;
+    if (RegExp(r'\d').hasMatch(password)) strength += 0.33;
+    if (RegExp(r'[!@#$%^&*(),.?":{}|<>]').hasMatch(password)) strength += 0.34;
+
+    return strength;
   }
 }

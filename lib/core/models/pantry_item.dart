@@ -119,6 +119,8 @@ class PantryItem {
     );
   }
 
+  get imagePath => null;
+
   // Convert to JSON
   Map<String, dynamic> toJson() {
     return {
