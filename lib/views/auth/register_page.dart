@@ -165,6 +165,16 @@ class _RegisterPageState extends State<RegisterPage> {
 
               const SizedBox(height: 16),
 
+              // Confirm Password field
+              _buildPasswordField(
+                controller: _confirmPasswordController,
+                hintText: 'Confirm Password',
+                obscureText: _obscurePassword,
+                onToggle: () => setState(() => _obscurePassword = !_obscurePassword),
+              ),
+
+              const SizedBox(height: 16),
+
               // Password strength indicator
               Container(
                 height: 4,

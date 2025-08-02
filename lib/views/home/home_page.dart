@@ -262,9 +262,9 @@ class _HomePageState extends State<HomePage> {
     final double budgetPercentage = _weeklyBudget > 0 ? _spentAmount / _weeklyBudget : 0;
 
     // Theme colors matching the new dark green design:
-    const Color backgroundColor = Color(0xFF1B2B1B);        // Outer background
-    const Color cardColor = Color(0xFF2A3B2A);              // Main container color
-    const Color primaryGreen = Color(0xFF4CAF50);           // Bright accent
+    const Color backgroundColor = Color(0xFF1B2B1B);
+    const Color cardColor = Color(0xFF2A3B2A);
+    const Color primaryGreen = Color(0xFF4CAF50);
     const Color textPrimary = Colors.white;
     const Color textSecondary = Color(0xFFB0B0B0);
     const Color inputBackground = Color(0xFF3A4B3A);
@@ -564,46 +564,6 @@ class _HomePageState extends State<HomePage> {
             ],
           ),
         ),
-      ),
-      bottomNavigationBar: BottomNavigationBar(
-        backgroundColor: backgroundColor,
-        selectedItemColor: primaryGreen,
-        unselectedItemColor: textSecondary,
-        type: BottomNavigationBarType.fixed,
-        items: const [
-          BottomNavigationBarItem(
-            icon: Icon(Icons.home),
-            label: 'Home',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.restaurant_menu),
-            label: 'Recipes',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.shopping_cart),
-            label: 'Shopping',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.person),
-            label: 'Profile',
-          ),
-        ],
-        currentIndex: 0,
-        onTap: (index) {
-          switch (index) {
-            case 0:
-              break;
-            case 1:
-              context.push('/recipes');
-              break;
-            case 2:
-              context.push('/shopping-list');
-              break;
-            case 3:
-              context.push('/profile');
-              break;
-          }
-        },
       ),
     );
   }
